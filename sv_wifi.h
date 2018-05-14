@@ -13,12 +13,8 @@ void svConnect(configStruct conf) {
 void checkForUpdate(char *OTAIPAddress, const char *current_version) {
   char OTAURL[128];
   char OTAPATH[] = "/svUpdate/svUpdate.php";
-  
-  Serial.print("Checking for update at ");
-  Serial.print(OTAIPAddress);
-  Serial.println(OTAPATH);
-  Serial.print("Current version is: ");
-  Serial.println(current_version);
+
+  Serial.println("Checking for updates.");
   
   t_httpUpdate_return ret = ESPhttpUpdate.update(OTAIPAddress, 80, OTAPATH, current_version);
     switch (ret) {
@@ -26,11 +22,18 @@ void checkForUpdate(char *OTAIPAddress, const char *current_version) {
         Serial.printf("HTTP_UPDATE_FAILED Error (%d): %s",  ESPhttpUpdate.getLastError(), ESPhttpUpdate.getLastErrorString().c_str());
         break;
       case HTTP_UPDATE_NO_UPDATES:
-        Serial.println("[update] Update no Update.");
+        Serial.println("No updates");
         break;
       case HTTP_UPDATE_OK:
-        Serial.println("[update] Update ok."); // may not called we reboot the ESP
         break;
     }
+}
+
+void sendTemperature(byte roomNumber, float temp) {
+  return;
+}
+
+int getExpectedPosition(byte roomNumber) {
+  return SV_CLOSED;
 }
 

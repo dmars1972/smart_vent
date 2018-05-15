@@ -1,10 +1,11 @@
 #include <Servo.h>
+#include <SpritzCipher.h>
 #include "sv_eeprom.h"
 #include "initialize.h"
 #include "sv_wifi.h"
 #include "temperature.h"
 
-const char CURRENT_VERSION[] = "1.17";
+const char CURRENT_VERSION[] = "1.25";
 const char VENT_PIN = 4;
 
 configStruct conf;
@@ -13,6 +14,9 @@ Servo vent;
 int currentPos = SV_OPEN;
 
 void setup() {
+  spritz_ctx s_ctx;
+  byte key[32] = {'k','a','u','o','k','2','9','u','a','9','$','3','8','7','a','8','9','d','a','8','n','w','?','u','l','s','U','9','3','4','n','o'};
+  int i;
   Serial.begin(115200);
   Serial.println("Getting configuration...");
   conf = getConfiguration();
@@ -30,9 +34,12 @@ void setup() {
     Serial.print("Got room number: ");
     Serial.println(conf.roomNumber, DEC);
   }
-
+  
+  spritz_setup(&s_ctx, key, sizeof(key));
+  spritz_crypt(&s_ctx, conf.password, sizeof(conf.password), conf.password);  
+  
  Serial.println("Connecting to wifi...");
- svConnect(conf);
+ svStartWifi(conf);
  Serial.println("Connected.");
 
   if(conf.hasTempSensor)
@@ -48,15 +55,6 @@ void setup() {
   currentPos = SV_OPEN;
 
   vent.detach();
-}
-
-void printAddress(DeviceAddress deviceAddress)
-{
-  for (uint8_t i = 0; i < 8; i++)
-  {
-    if (deviceAddress[i] < 16) Serial.print("0");
-    Serial.print(deviceAddress[i], HEX);
-  }
 }
 
 void loop() {

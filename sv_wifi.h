@@ -2,10 +2,17 @@
 #include <ESP8266httpUpdate.h>
 #include "types.h"
 
-void svConnect(configStruct conf) {
-  WiFi.begin(conf.ssid, conf.password);
+void svStartWifi(configStruct conf) {
+  WiFi.begin(conf.ssid, (char *)conf.password);
 
   while(WiFi.status() != WL_CONNECTED) {
+    delay(500);
+  }
+}
+void svConnect(configStruct conf) {
+  // Just make sure we're still connected.  If not, reconnect.
+  while(WiFi.status() != WL_CONNECTED) {  
+    WiFi.begin(conf.ssid, (char *)conf.password);
     delay(500);
   }
 }
@@ -30,10 +37,12 @@ void checkForUpdate(char *OTAIPAddress, const char *current_version) {
 }
 
 void sendTemperature(byte roomNumber, float temp) {
+  // Nothing to see here yet, need to work on the thermostat
   return;
 }
 
 int getExpectedPosition(byte roomNumber) {
+  // Ditto
   return SV_CLOSED;
 }
 

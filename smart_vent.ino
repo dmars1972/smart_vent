@@ -1,11 +1,12 @@
 #include <Servo.h>
-#include <SpritzCipher.h>
+
 #include "sv_eeprom.h"
 #include "initialize.h"
 #include "sv_wifi.h"
 #include "temperature.h"
 
-const char CURRENT_VERSION[] = "1.25";
+const char CURRENT_VERSION[] = "1.39";
+const char DEVICE_TYPE[] = "vent";
 const char VENT_PIN = 4;
 
 configStruct conf;
@@ -13,11 +14,18 @@ char OTAIPAddress[16];
 Servo vent;
 int currentPos = SV_OPEN;
 
+byte macAddress[6];
+char myName[21];
+bool isRegistered = false;
+
 void setup() {
-  spritz_ctx s_ctx;
-  byte key[32] = {'k','a','u','o','k','2','9','u','a','9','$','3','8','7','a','8','9','d','a','8','n','w','?','u','l','s','U','9','3','4','n','o'};
   int i;
   Serial.begin(115200);
+  Serial.print("Device: ");
+  Serial.println(DEVICE_TYPE);
+  Serial.print("Software version: ");
+  Serial.println(CURRENT_VERSION);
+  
   Serial.println("Getting configuration...");
   conf = getConfiguration();
 
@@ -34,14 +42,22 @@ void setup() {
     Serial.print("Got room number: ");
     Serial.println(conf.roomNumber, DEC);
   }
-  
-  spritz_setup(&s_ctx, key, sizeof(key));
-  spritz_crypt(&s_ctx, conf.password, sizeof(conf.password), conf.password);  
-  
- Serial.println("Connecting to wifi...");
- svStartWifi(conf);
- Serial.println("Connected.");
 
+  svDecrypt(conf.password, sizeof(conf.password));
+
+  WiFi.macAddress(macAddress);
+
+  sprintf(myName, "sv%02x%02x%02x%02x%02x%02x", macAddress[0], macAddress[1], macAddress[2], macAddress[3], macAddress[4], macAddress[5]);
+  WiFi.hostname(myName);
+  
+  Serial.print("My host name is: ");
+  Serial.println(myName);
+  Serial.println("Connecting to wifi...");
+  svStartWifi(conf);
+  Serial.println("Connected.");
+
+  isRegistered = svRegister(myName, conf.roomNumber);
+  
   if(conf.hasTempSensor)
     initTemperatureSensor(DS_PIN);
 
@@ -62,8 +78,8 @@ void loop() {
   int expectedPos;
   
   svConnect(conf);
-  
-  checkForUpdate(OTAIPAddress, (char *)CURRENT_VERSION);
+
+  checkForUpdate(OTAIPAddress, (char *)CURRENT_VERSION, DEVICE_TYPE);
 
   if(conf.hasTempSensor) {
     temperature = getCurrentTemperature();

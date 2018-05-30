@@ -1,16 +1,21 @@
 #include <Servo.h>
 
-#include "sv_eeprom.h"
-#include "initialize.h"
-#include "sv_wifi.h"
-#include "temperature.h"
+#include <SmartConfig.h>
+#include <SmartVentComm.h>
+#include "SmartTemp.h"
 
-const char CURRENT_VERSION[] = "1.39";
+#include "initialize.h"
+
+#define SEND_INTERVAL 30
+
+const char CURRENT_VERSION[] = "1.66";
 const char DEVICE_TYPE[] = "vent";
 const char VENT_PIN = 4;
 
-configStruct conf;
-char OTAIPAddress[16];
+SmartVentComm svc(25836, 25837);
+
+SmartConfig c;
+
 Servo vent;
 int currentPos = SV_OPEN;
 
@@ -27,40 +32,21 @@ void setup() {
   Serial.println(CURRENT_VERSION);
   
   Serial.println("Getting configuration...");
-  conf = getConfiguration();
-
-  sprintf(OTAIPAddress, "%d.%d.%d.%d", conf.otaIPAddress[0], conf.otaIPAddress[1], conf.otaIPAddress[2], conf.otaIPAddress[3]);
-
-  Serial.print("OTA IP Address is: ");
-  Serial.println(OTAIPAddress);
+  c.setup();
   
-  if(conf.roomNumber == 0) {
+  if(c.getRoomNumber() == 255) {
     Serial.println("Not set up");
     initialize();
   }
   else {
     Serial.print("Got room number: ");
-    Serial.println(conf.roomNumber, DEC);
+    Serial.println(c.getRoomNumber(), DEC);
   }
 
-  svDecrypt(conf.password, sizeof(conf.password));
-
-  WiFi.macAddress(macAddress);
-
-  sprintf(myName, "sv%02x%02x%02x%02x%02x%02x", macAddress[0], macAddress[1], macAddress[2], macAddress[3], macAddress[4], macAddress[5]);
-  WiFi.hostname(myName);
+  while( ! svc.registerVent(c.hasTempSensor())) {
+    delay(30000);
+  }
   
-  Serial.print("My host name is: ");
-  Serial.println(myName);
-  Serial.println("Connecting to wifi...");
-  svStartWifi(conf);
-  Serial.println("Connected.");
-
-  isRegistered = svRegister(myName, conf.roomNumber);
-  
-  if(conf.hasTempSensor)
-    initTemperatureSensor(DS_PIN);
-
   vent.attach(VENT_PIN);
 
   vent.write(SV_OPEN);
@@ -74,27 +60,18 @@ void setup() {
 }
 
 void loop() {
-  float temperature;
-  int expectedPos;
+  static long lastSend = 0;
   
-  svConnect(conf);
-
-  checkForUpdate(OTAIPAddress, (char *)CURRENT_VERSION, DEVICE_TYPE);
-
-  if(conf.hasTempSensor) {
-    temperature = getCurrentTemperature();
-    sendTemperature(conf.roomNumber, temperature);
+  c.OTAUpdate(CURRENT_VERSION, DEVICE_TYPE);
+  
+  if(lastSend == 0 ||                                   // first call
+      (millis() - lastSend) / 1000 > SEND_INTERVAL ||   // has interval passed
+      millis() < lastSend) {                            // has the millis reset?
+    Serial.println("Sending");
+    lastSend = millis();
+    
+    svc.sendTemperature((unsigned char)60);
   }
   
-  expectedPos = getExpectedPosition(conf.roomNumber);
-
-  if(expectedPos != currentPos) {
-    vent.attach(VENT_PIN);
-    vent.write(expectedPos);
-    delay(500);
-    vent.detach();
-    currentPos = expectedPos;
-  }
   
-  delay(30000);
 }
